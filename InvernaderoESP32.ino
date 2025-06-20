@@ -22,6 +22,8 @@ DHT dht(DHTPIN, DHTTYPE);
 
 // Variables de estado
 bool controlManualBomba = false; // Indica si la bomba está controlada manualmente
+bool controlManualVentilador = false; // Indica si el ventilador está controlado manualmente
+bool estadoVentiladorManual = false; // Estado actual del ventilador en modo manual
 unsigned long tiempoFinRiego = 0; // Para controlar el tiempo de riego automático
 
 void setup() {
@@ -51,8 +53,26 @@ BLYNK_WRITE(V3) { // Control manual de la bomba desde Blynk
   }
 }
 
+BLYNK_WRITE(V4) { // Control manual del ventilador desde Blynk
+  int valor = param.asInt(); // 0 = apagado, 1 = encendido
+  
+  controlManualVentilador = (valor == 1);
+  estadoVentiladorManual = controlManualVentilador;
+  
+  if (controlManualVentilador) {
+    Serial.println("Ventilador activado manualmente desde Blynk");
+    digitalWrite(ventiladorPin, HIGH);
+  } else {
+    Serial.println("Ventilador desactivado manualmente desde Blynk");
+    digitalWrite(ventiladorPin, LOW);
+  }
+}
+
 void controlarVentilador(bool estado) {
-  digitalWrite(ventiladorPin, estado ? HIGH : LOW);
+  // Solo cambia el estado si no está en modo manual
+  if (!controlManualVentilador) {
+    digitalWrite(ventiladorPin, estado ? HIGH : LOW);
+  }
 }
 
 void activarBomba(int tiempoMs) {
@@ -93,12 +113,14 @@ void loop() {
     }
   }
   
-  // Control de ventilador
-  if (temperatura > 28 || humedadAmbiente > 70) {
-    Serial.println("Activando ventilador por alta temperatura/humedad");
-    controlarVentilador(true);
-  } else {
-    controlarVentilador(false);
+  // Control de ventilador (solo si no está en control manual)
+  if (!controlManualVentilador) {
+    if (temperatura > 28 || humedadAmbiente > 70) {
+      Serial.println("Activando ventilador por alta temperatura/humedad");
+      controlarVentilador(true);
+    } else {
+      controlarVentilador(false);
+    }
   }
   
   delay(1000); // Reducido a 1 segundo para mejor respuesta
